@@ -18,7 +18,7 @@ COPY scripts ./scripts
 COPY tsconfig.base.json tsconfig.json ./
 
 # Install dependencies
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 # Set environment variables for build
 ENV NODE_ENV=production
