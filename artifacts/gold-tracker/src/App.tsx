@@ -260,6 +260,7 @@ function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   const [history, setHistory] = useState<Point[]>([]);
   const [open, setOpen] = useState(false);
   const [pulse, setPulse] = useState(false);
+  const [liveStats, setLiveStats] = useState<{ high: number; low: number; changePct: number } | null>(null);
 
   const [calcWeight, setCalcWeight] = useState<number>(1);
   const [calcUnit, setCalcUnit] = useState("bhori");
@@ -332,6 +333,14 @@ function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       const spotUSD = g.data.price;
       const bhoriBDT = (spotUSD / 42.5) * 16 * usdToBdt + 5000;
       const spotBDTPerGram = bhoriBDT / GRAM_TO_BHORI;
+      
+      // Update live stats for the header badges
+      const apiData = g.data as any;
+      setLiveStats({
+        high: ((apiData.high || spotUSD) / 42.5) * 16 * usdToBdt + 5000,
+        low: ((apiData.low || spotUSD) / 42.5) * 16 * usdToBdt + 5000,
+        changePct: apiData.change_percent || 0
+      });
       
       setPrices({
         usdPerGram: spotUSD / TROY_OUNCE_TO_GRAM,
@@ -513,15 +522,25 @@ function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => void })
                 </p>
               </div>
 
-              {marketStats && (
+              {(liveStats || marketStats) && (
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  <ChartChip Icon={ArrowUp} label="High" value={`৳${Math.floor(marketStats.high).toLocaleString()}`} color="hsl(142 70% 55%)" />
-                  <ChartChip Icon={ArrowDown} label="Low" value={`৳${Math.floor(marketStats.low).toLocaleString()}`} color="hsl(0 80% 65%)" />
+                  <ChartChip 
+                    Icon={ArrowUp} 
+                    label="High" 
+                    value={`৳${Math.floor(liveStats?.high || marketStats?.high || 0).toLocaleString()}`} 
+                    color="hsl(142 70% 55%)" 
+                  />
+                  <ChartChip 
+                    Icon={ArrowDown} 
+                    label="Low" 
+                    value={`৳${Math.floor(liveStats?.low || marketStats?.low || 0).toLocaleString()}`} 
+                    color="hsl(0 80% 65%)" 
+                  />
                   <ChartChip
-                    Icon={marketStats.change >= 0 ? ArrowUpRight : ArrowDownRight}
+                    Icon={(liveStats?.changePct || marketStats?.change || 0) >= 0 ? ArrowUpRight : ArrowDownRight}
                     label="Change"
-                    value={`${marketStats.change >= 0 ? "+" : ""}${marketStats.changePct.toFixed(2)}%`}
-                    color={marketStats.change >= 0 ? "hsl(142 70% 55%)" : "hsl(0 80% 65%)"}
+                    value={`${(liveStats?.changePct || marketStats?.changePct || 0) >= 0 ? "+" : ""}${(liveStats?.changePct || marketStats?.changePct || 0).toFixed(2)}%`}
+                    color={(liveStats?.changePct || marketStats?.changePct || 0) >= 0 ? "hsl(142 70% 55%)" : "hsl(0 80% 65%)"}
                   />
                 </div>
               )}
