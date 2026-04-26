@@ -32,12 +32,8 @@ RUN pnpm --filter @workspace/gold-tracker --filter @workspace/api-server run bui
 FROM base AS runner
 WORKDIR /app
 
-# Copy built assets from builder
-COPY --from=builder /app/artifacts/api-server/dist ./artifacts/api-server/dist
-COPY --from=builder /app/artifacts/gold-tracker/dist ./artifacts/gold-tracker/dist
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/artifacts/api-server/package.json ./artifacts/api-server/package.json
+# Copy all files from builder to preserve pnpm workspace symlinks
+COPY --from=builder /app .
 
 # Set environment variables
 ENV NODE_ENV=production
