@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, memo } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -214,6 +214,43 @@ function BreakdownRow({
   );
 }
 
+const TradingViewWidget = memo(function TradingViewWidget() {
+  const container = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (container.current) {
+      container.current.innerHTML = "";
+      const script = document.createElement("script");
+      script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+      script.type = "text/javascript";
+      script.async = true;
+      script.innerHTML = JSON.stringify({
+        "autosize": true,
+        "symbol": "TVC:GOLD*USDBDT",
+        "interval": "1D",
+        "timezone": "Etc/UTC",
+        "theme": "dark",
+        "style": "1",
+        "locale": "en",
+        "enable_publishing": false,
+        "allow_symbol_change": true,
+        "calendar": false,
+        "watchlist": [
+          "TVC:GOLD"
+        ],
+        "support_host": "https://www.tradingview.com"
+      });
+      container.current.appendChild(script);
+    }
+  }, []);
+
+  return (
+    <div className="tradingview-widget-container" style={{ height: "600px", width: "100%", borderRadius: "12px", overflow: "hidden" }}>
+      <div className="tradingview-widget-container__widget" ref={container} style={{ height: "100%", width: "100%" }}></div>
+    </div>
+  );
+});
+
 function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   const [prices, setPrices] = useState<Prices>({
     usdPerGram: 0,
@@ -250,7 +287,7 @@ function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   const value = calc.total;
 
   const marketStats = useMemo(() => {
-    if (!history.length) return null;
+    if (!Array.isArray(history) || !history.length) return null;
     const prices24 = history.map((p) => p.price * GRAM_TO_BHORI);
     const high = Math.max(...prices24);
     const low = Math.min(...prices24);
@@ -263,6 +300,7 @@ function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   }, [history]);
 
   const bhoriHistory = useMemo(() => {
+    if (!Array.isArray(history)) return [];
     return history.map(p => ({
       ...p,
       price: p.price * GRAM_TO_BHORI
@@ -272,7 +310,7 @@ function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => void })
   const fetchHistory = async () => {
     try {
       const r = await api.get<Point[]>("/prices/daily-history");
-      if (r.data.length) setHistory(r.data);
+      if (Array.isArray(r.data)) setHistory(r.data);
     } catch {
       // no-op
     }
@@ -289,14 +327,16 @@ function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => void })
       const usdToBdt = c.data.rates["BDT"];
       if (!usdToBdt) return;
       
-      // User specified formula: (Spot USD * Rate / 42.5) * 16 + 5000 = BDT per Bhori
-      const bhoriBDT = (g.data.price / 42.5) * 16 * usdToBdt + 5000;
-      const newBDT = bhoriBDT / GRAM_TO_BHORI;
+      // Calculate BDT per Bhori using the local Bangladesh market formula
+      // (Spot USD / 42.5) * 16 * Rate + 5000 = BDT per Bhori
+      const spotUSD = g.data.price;
+      const bhoriBDT = (spotUSD / 42.5) * 16 * usdToBdt + 5000;
+      const spotBDTPerGram = bhoriBDT / GRAM_TO_BHORI;
       
       setPrices({
-        usdPerGram: g.data.price / TROY_OUNCE_TO_GRAM,
-        bdtPerGram: newBDT,
-        k22: newBDT * (22 / 24),
+        usdPerGram: spotUSD / TROY_OUNCE_TO_GRAM,
+        bdtPerGram: spotBDTPerGram,
+        k22: spotBDTPerGram * (22 / 24),
       });
       setPulse(true);
       setTimeout(() => setPulse(false), 1800);
@@ -463,13 +503,13 @@ function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => void })
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
                   <TrendingUp size={20} style={{ color: "hsl(var(--gold))" }} />
-                  <h3 style={{ fontWeight: 700 }}>24-Hour Market Trend</h3>
+                  <h3 style={{ fontWeight: 700 }}>Gold Market Trend (BDT)</h3>
                   <span className="badge badge-gold" style={{ marginLeft: 6 }}>
                     <span className="live-dot" /> LIVE · 🇧🇩
                   </span>
                 </div>
                 <p className="subtitle" style={{ fontSize: "0.78rem" }}>
-                  Bangladesh price per bhori · auto-refreshed every 10 seconds
+                  Live Gold Spot Price in Bangladeshi Taka (BDT)
                 </p>
               </div>
 
@@ -487,115 +527,7 @@ function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => void })
               )}
             </div>
 
-            {bhoriHistory.length ? (
-              <ResponsiveContainer width="100%" height={340}>
-                <AreaChart data={bhoriHistory} margin={{ top: 8, right: 18, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="gldGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(45 95% 55%)" stopOpacity={0.55} />
-                      <stop offset="95%" stopColor="hsl(45 95% 55%)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="rgba(255,255,255,0.05)"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="time"
-                    stroke="#777"
-                    fontSize={10}
-                    tickLine={false}
-                    axisLine={false}
-                    minTickGap={32}
-                  />
-                   <YAxis
-                    stroke="#777"
-                    fontSize={10}
-                    tickLine={false}
-                    axisLine={false}
-                    width={62}
-                    domain={["auto", "auto"]}
-                    tickFormatter={(v: number) => `৳${(v / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip
-                    cursor={{ stroke: "hsl(var(--gold))", strokeOpacity: 0.3, strokeWidth: 1, strokeDasharray: "4 4" }}
-                    content={({ active, payload, label }) => {
-                      if (!active || !payload?.length || !marketStats) return null;
-                      const v = payload[0]!.value as number;
-                      const delta = v - marketStats.first;
-                      const deltaPct = marketStats.first ? (delta / marketStats.first) * 100 : 0;
-                      return (
-                        <div
-                          style={{
-                            background: "hsl(230 22% 8% / 0.96)",
-                            border: "1px solid var(--gold-border)",
-                            borderRadius: 12,
-                            padding: "10px 14px",
-                            backdropFilter: "blur(12px)",
-                            boxShadow: "0 8px 30px rgba(0,0,0,0.4)",
-                          }}
-                        >
-                          <div style={{ fontSize: "0.7rem", color: "#999", marginBottom: 4 }}>{label}</div>
-                          <div className="gold-text" style={{ fontSize: "1.1rem", fontWeight: 800 }}>
-                            ৳{v.toLocaleString()}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "0.72rem",
-                              color: delta >= 0 ? "hsl(142 70% 60%)" : "hsl(0 80% 68%)",
-                              marginTop: 2,
-                              fontWeight: 600,
-                            }}
-                          >
-                            {delta >= 0 ? "▲" : "▼"} {delta >= 0 ? "+" : ""}৳{Math.round(delta).toLocaleString()} ({deltaPct.toFixed(2)}%)
-                          </div>
-                        </div>
-                      );
-                    }}
-                  />
-                  {marketStats && (
-                    <ReferenceLine
-                      y={marketStats.avg}
-                      stroke="hsl(var(--gold))"
-                      strokeOpacity={0.3}
-                      strokeDasharray="4 4"
-                      label={{
-                        value: `Avg ৳${Math.floor(marketStats.avg).toLocaleString()}`,
-                        position: "insideTopRight",
-                        fill: "hsl(var(--gold))",
-                        fontSize: 10,
-                        fontWeight: 700,
-                      }}
-                    />
-                  )}
-                  <Area
-                    type="monotone"
-                    dataKey="price"
-                    stroke="hsl(45 95% 55%)"
-                    strokeWidth={2.5}
-                    fill="url(#gldGradient)"
-                    dot={false}
-                    activeDot={{ r: 5, fill: "hsl(var(--gold-bright))", stroke: "#1a1300", strokeWidth: 2 }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div
-                style={{
-                  height: 340,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "hsl(var(--text-muted))",
-                  flexDirection: "column",
-                  gap: 10,
-                }}
-              >
-                <Loader2 className="spin" size={20} style={{ color: "hsl(var(--gold))" }} />
-                <span style={{ fontSize: "0.85rem" }}>Building 24h spectrum…</span>
-              </div>
-            )}
+            <TradingViewWidget />
           </div>
 
           <div className="glass-card span-full fade-up">
