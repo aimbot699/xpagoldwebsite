@@ -226,7 +226,7 @@ const TradingViewWidget = memo(function TradingViewWidget() {
       script.async = true;
       script.innerHTML = JSON.stringify({
         "autosize": true,
-        "symbol": "(TVC:GOLD/42.5)*16*USDBDT+5000",
+        "symbol": "TVC:GOLD*16/42.5*FX_IDC:USDBDT+5000",
         "interval": "1D",
         "timezone": "Etc/UTC",
         "theme": "dark",
