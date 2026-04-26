@@ -521,29 +521,6 @@ function Dashboard({ user, onLogout }: { user: AuthUser; onLogout: () => void })
                   Live Gold Spot Price in Bangladeshi Taka (BDT)
                 </p>
               </div>
-
-              {(liveStats || marketStats) && (
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  <ChartChip 
-                    Icon={ArrowUp} 
-                    label="High" 
-                    value={`৳${Math.floor(liveStats?.high || marketStats?.high || 0).toLocaleString()}`} 
-                    color="hsl(142 70% 55%)" 
-                  />
-                  <ChartChip 
-                    Icon={ArrowDown} 
-                    label="Low" 
-                    value={`৳${Math.floor(liveStats?.low || marketStats?.low || 0).toLocaleString()}`} 
-                    color="hsl(0 80% 65%)" 
-                  />
-                  <ChartChip
-                    Icon={(liveStats?.changePct || marketStats?.change || 0) >= 0 ? ArrowUpRight : ArrowDownRight}
-                    label="Change"
-                    value={`${(liveStats?.changePct || marketStats?.changePct || 0) >= 0 ? "+" : ""}${(liveStats?.changePct || marketStats?.changePct || 0).toFixed(2)}%`}
-                    color={(liveStats?.changePct || marketStats?.changePct || 0) >= 0 ? "hsl(142 70% 55%)" : "hsl(0 80% 65%)"}
-                  />
-                </div>
-              )}
             </div>
 
             <TradingViewWidget />
